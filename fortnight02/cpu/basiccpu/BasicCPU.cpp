@@ -117,6 +117,11 @@ int BasicCPU::ID()
 			break;
 		// case TODO
 		// x101 Data Processing -- Register on page C4-278
+		case 0xD000000:
+		case 0x5000000:
+			fpOP = false;
+			return decodeDataProcReg();
+			break;
 		default:
 			return 1; // instrução não implementada
 	}
@@ -227,7 +232,47 @@ int BasicCPU::decodeDataProcReg() {
 	//				'add w1, w1, w0'
 	//		que aparece na linha 43 de isummation.S e no endereço 0x68
 	//		de txt_isummation.o.txt.
-	
+	unsigned int n, d;
+	int imm6;
+	switch (IR & 0x7F200000)
+	{
+		case 0x0B000000:
+			
+			// ler A e B
+			n = (IR & 0x000003E0) >> 4;
+			if (n == 31) {
+				A = SP;
+			} else {
+				A = getX(n); // 64-bit variant
+			}
+			imm6 = (IR & 0x0000FC00) >> 10;
+			B = imm6;
+			
+			// registrador destino
+			d = (IR & 0x0000000F) >> 15;
+			if (d == 31) {
+				Rd = &SP;
+			} else {
+				Rd = &(R[d]);
+			}
+			
+			// atribuir ALUctrl
+			ALUctrl = ALUctrlFlag::ADD;
+			
+			// atribuir MEMctrl
+			MEMctrl = MEMctrlFlag::MEM_NONE;
+			
+			// atribuir WBctrl
+			WBctrl = WBctrlFlag::RegWrite;
+			
+			// atribuir MemtoReg
+			MemtoReg = false;
+			
+			return 0;
+		default:
+			// instrução não implementada
+			return 1;
+	}
 	
 	// instrução não implementada
 	return 1;
