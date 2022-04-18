@@ -127,7 +127,10 @@ int BasicCPU::ID()
 		// implementar o GRUPO A SEGUIR
 		//
 		// 101x Loads and Stores on page C4-237
-
+		case 0xB9800FE1:
+		case 0xB9000FE0:
+			return decodeLoadStore();
+			break;
 		
 		// ATIVIDADE FUTURA
 		// implementar os demais grupos
@@ -224,6 +227,67 @@ int BasicCPU::decodeBranches() {
  *		   1: se a instrução não estiver implementada.
  */
 int BasicCPU::decodeLoadStore() {
+
+	unsigned int n,t,imm9;
+	int BW;
+
+	switch (IR & 0x1F900000)
+	{
+		
+		// C6.2.131 LDRSW (immediate)
+		case 0x0001000:
+			if (IR & 0x80000000) return 1;
+		
+			n=(IR & 0x000003E0) >> 5;
+			A=getW(n);
+		
+			n=(IR & 0x00001F00) >> 9;
+			BW=getW(t);
+		
+			imm9=(IR & 0x0003FC00) >> 12;
+
+			// atribuir ALUctrl
+			ALUctrl = ALUctrlFlag::ADD;
+			
+			// atribuir MEMctrl
+			MEMctrl = MEMctrlFlag::READ64;
+			
+			// atribuir WBctrl
+			WBctrl = WBctrlFlag::RegWrite;
+			
+			// atribuir MemtoReg
+			MemtoReg = true;
+
+			return 0;
+
+			// C6.2.257 STR (immediate)
+		case 0x01C00000:
+			if (IR & 0x80000000) return 1;
+		
+			n=(IR & 0x000003E0) >> 5;
+			A=getW(n);
+		
+			n=(IR & 0x00001F00) >> 9;
+			BW=getW(t);
+		
+			imm9=(IR & 0x0003FC00) >> 12;
+
+			// atribuir ALUctrl
+			ALUctrl = ALUctrlFlag::ADD;
+			
+			// atribuir MEMctrl
+			MEMctrl = MEMctrlFlag::WRITE32;
+			
+			// atribuir WBctrl
+			WBctrl = WBctrlFlag::WB_NONE;
+			
+			// atribuir MemtoReg
+			MemtoReg = true;
+
+			return 0;
+		
+	}
+
 	// instrução não implementada
 	return 1;
 }
@@ -242,12 +306,11 @@ int BasicCPU::decodeDataProcReg() {
 	// de dados por registrador.
 
 	unsigned int n,m,shift,imm6;
-	
+
 	switch (IR & 0xFF200000)
 	{
 		
 		// C6.2.5 ADD (shifted register) p. C6-688
-		case 0x8B000000:
 		case 0x0B000000:
 			// sf == 1 not implemented (64 bits)
 			if (IR & 0x80000000) return 1;
@@ -280,6 +343,15 @@ int BasicCPU::decodeDataProcReg() {
 			
 			// TODO:
 			// implementar informações para os estágios MEM e WB.
+			
+			// atribuir MEMctrl
+			MEMctrl = MEMctrlFlag::MEM_NONE;
+			
+			// atribuir WBctrl
+			WBctrl = WBctrlFlag::RegWrite;
+			
+			// atribuir MemtoReg
+			MemtoReg = false;
 
 			return 0;
 	}
@@ -381,6 +453,9 @@ int BasicCPU::EXI()
 			return 0;
 		//case ALUctrlFlag::ADD:
 		// TODO
+		case ALUctrlFlag::ADD:
+			ALUout = A + B;
+			return 0;
 		default:
 			// Controle não implementado
 			return 1;
@@ -444,22 +519,22 @@ int BasicCPU::MEM()
 	// com as chamadas aos métodos corretos que implementam cada caso de acesso
 	// à memória de dados.
 
-	//switch (MEMctrl) {
-	//case MEMctrlFlag::READ32:
-		//MDR = memory->readData32(ALUout);
-		//return 0;
-	//case MEMctrlFlag::WRITE32:
-		//memory->writeData32(ALUout,*Rd);
-		//return 0;
-	//case MEMctrlFlag::READ64:
-		//MDR = memory->readData64(ALUout);
-		//return 0;
-	//case MEMctrlFlag::WRITE64:
-		//memory->writeData64(ALUout,*Rd);
-		//return 0;
-	//default:
-		//return 0;
-	//}
+	switch (MEMctrl) {
+	case MEMctrlFlag::READ32:
+		MDR = memory->readData32(ALUout);
+		return 0;
+	case MEMctrlFlag::WRITE32:
+		memory->writeData32(ALUout,*Rd);
+		return 0;
+	case MEMctrlFlag::READ64:
+		MDR = memory->readData64(ALUout);
+		return 0;
+	case MEMctrlFlag::WRITE64:
+		memory->writeData64(ALUout,*Rd);
+		return 0;
+	default:
+		return 0;
+	}
 
 	return 1;
 }
@@ -479,20 +554,21 @@ int BasicCPU::WB()
 	// com as atribuições corretas do registrador destino, quando houver, ou
 	// return 0 no caso WBctrlFlag::WB_NONE.
 	
-    //switch (WBctrl) {
-        //case WBctrlFlag::WB_NONE:
-            //return 0;
-        //case WBctrlFlag::RegWrite:
-            //if (MemtoReg) {
-                //*Rd = MDR;
-            //} else {
-                //*Rd = ALUout;
-            //}
-            //return 0;
-        //default:
-             ////não implementado
+    switch (WBctrl) {
+        case WBctrlFlag::WB_NONE:
+            return 0;
+        case WBctrlFlag::RegWrite:
+            if (MemtoReg) {
+                *Rd = MDR;
+            } else {
+                *Rd = ALUout;
+            }
+            return 0;
+        default:
+             //não implementado
             return 1;
-    //}
+    }
+	
 }
 
 
